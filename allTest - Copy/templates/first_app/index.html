@@ -1,0 +1,342 @@
+{% extends 'first_app/base.html' %}
+{% block body %}
+
+
+
+<div class="container my-10 text-center">
+    <form id="profileForm" method="POST" enctype="multipart/form-data" class="p-10 shadow-lg flex flex-col">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <!-- <input type="file" id="id_image" class="form-control my-5" accept="image/*"> -->
+
+        <!-- Crop Box Scale Control -->
+        <div class="my-3">
+            <div id="slider" class="hidden w-1/2 md:w-1/4 mx-auto"></div>
+        </div>
+
+        
+
+        <div class="wrap md:w-[500px] mx-auto rounded-lg shadow-xl relative overflow-hidden" style="display: none;">
+            <img id="selected_image" src="" alt="Image" class="w-100 h-100">
+            <div id="crop_area" class="border-3 border-orange-700 cursor-move" style="width: 100px; height: 100px; position: absolute; top: 0; left: 0;"></div>
+        </div>
+
+        <button type="button" id="cropBtn" class="btn btn-warning my-3" style="display:none;">Crop Image</button>
+        <input type="hidden" name="cropped_image" id="cropped_image">
+        <input type="submit" id="submit_btn" value="Upload" class="btn btn-success my-5">
+    </form>
+</div>
+
+
+
+<div class="h-[200px] w-[200px]"></div>
+
+
+
+{% endblock %}
+{% block script %}
+
+<script>
+
+const imageInput = $('#id_image');
+const img = $('#selected_image');
+const cropArea = $('#crop_area');
+const container = $('.wrap');
+let cropSize = 100;  // Initial crop-box size (1:1)
+let scaleMax = container.width()/2;  // Maximum crop size based on container
+
+// Crop-box resizing based on the scale control
+function slide_event(){
+    let scaleValue = $('#slider').slider( "value" );
+
+    // Ensure crop size doesn't exceed container dimensions
+    cropSize = Math.min(scaleValue, scaleMax);
+    cropArea.css({ width: cropSize + 100, height: cropSize + 100 });
+
+    // Update draggable containment for crop area
+    cropArea.draggable('option', 'containment', container);
+}
+
+$('#slider').slider({
+    min : 0,
+    max : scaleMax,
+    orientation: "horizontal",
+
+    slide : slide_event,
+});
+$('#slider .ui-slider-range').addClass('bg-gray-600');
+$('#slider .ui-slider-handle').addClass('bg-teal-600');
+
+// Function to reset the crop box position and size
+function resetImage() {
+    cropSize = 100;  // Reset crop size
+    cropArea.css({ width: cropSize , height: cropSize , top: 0, left: 0 });
+    cropArea.draggable({
+        containment: container  // Constrain the crop-box within the .wrap container
+    });
+}
+
+// Image input change handler
+imageInput.on('change', function(e) {
+    let file = e.target.files[0];
+    let reader = new FileReader();
+
+    reader.onload = function(event) {
+        container.show();  // Show container when image is selected
+        img.attr('src', event.target.result);
+
+        resetImage();  // Reset crop area and draggable functionality
+        $('#cropBtn').show();
+        $('#slider').show();
+        cropArea.show();
+    };
+
+    reader.readAsDataURL(file);
+});
+
+
+
+
+// Crop button handler
+$('#cropBtn').on('click', function(e) {
+    e.preventDefault();
+
+    const cropWidth = cropArea.width();
+    const cropHeight = cropArea.height();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 200;  // Set fixed output size for cropped image
+    canvas.height = 200;
+
+    const ctx = canvas.getContext('2d');
+    const cropAreaPosition = cropArea.position();  // Position of the crop-box inside the container
+    const scaledWidth = img[0].naturalWidth;
+    const scaledHeight = img[0].naturalHeight;
+
+    // Calculate the position of the cropped area in the original image
+    const offsetX = cropAreaPosition.left * (scaledWidth / container.width());
+    const offsetY = cropAreaPosition.top * (scaledHeight / container.height());
+    const widthRatio = cropWidth * (scaledWidth / container.width());
+    const heightRatio = cropHeight * (scaledHeight / container.height());
+
+    ctx.drawImage(
+        img[0],  // Image element
+        offsetX, offsetY, widthRatio, heightRatio,  // Source coordinates and size
+        0, 0, 200, 200  // Destination coordinates and size (400x400 fixed)
+    );
+
+    // Convert canvas content to base64
+    const croppedDataURL = canvas.toDataURL('image/png');
+    $('#cropped_image').val(croppedDataURL);
+
+    // Replace the original image with the cropped one
+    img.attr('src', croppedDataURL);
+    $('#crop_area').hide();  // Hide the crop box
+    $('#cropBtn').hide();  // Hide the crop button
+    $('#slider').hide();
+});
+
+
+</script>
+
+<script>
+    // let img = $('#im');
+    // let scale = 1;
+    // let container = $('.wrap');
+    
+    // // Initial draggable setup
+    // let parentOffset = $('.wrap').offset();
+    
+    // img.draggable({ containment : 
+    // [
+    //     parentOffset.left-100, 
+    //     parentOffset.top-100,
+    //     parentOffset.left + 100,
+    //     parentOffset.top + 100
+    // ],
+    // cursor: 'move'}); 
+    
+    // function zoomIn() {
+    //     scale += 0.1;
+    //     applyTransform();
+    //     updateContainment();
+    // }
+    
+    // function zoomOut() {
+    //     if (scale > 0.2) {
+    //         scale -= 0.1;
+    //         applyTransform();
+    //         updateContainment();
+    //     }
+    // }
+    
+    // function applyTransform() {
+    //     img.css('transform', `scale(${scale})`);
+    // }
+    
+    // // Update containment based on the current scale
+    // function updateContainment() {
+    //     const containerWidth = container.width(); 
+    //     const containerHeight = container.height(); 
+    //     const scaledWidth = image.width() * scale;  
+    //     const scaledHeight = image.height() * scale;  
+
+        
+    //     image.draggable('option', 'containment', [
+    //         Math.min(parentOffset.left-100, parentOffset.left-100 + (containerWidth - scaledWidth)), 
+    //         Math.min(parentOffset.top-100, parentOffset.top-100 + (containerHeight - scaledHeight )),
+    //         Math.max(parentOffset.left + 100 + (containerWidth - scaledWidth), parentOffset.left + 100),    
+    //         Math.max(parentOffset.top + 100  + (containerHeight - scaledHeight ), parentOffset.top + 100)
+    //     ]);
+    // }
+    
+
+    </script>
+
+<script>
+//     $(document).ready(function() {
+
+
+//     const image = $('#id_image');
+//     image.on('change', function(e){
+//     let str = `<div id='preview_container' class='p-2 md:p-10 w-full md:w-1/2 mx-auto border-2'></div>`;
+//     $(this).after(str);
+
+
+
+    
+    
+
+//     let file = e.target.files[0];
+//     let reader = new FileReader();
+//     reader.onload = function(event) {
+
+//         // Create image wrapper with the uploaded image 
+//         $('#preview_container').append(`
+//             <div id='img_wrapper' class='relative block overflow-hidden w-full'>
+//                 <img id="selected_image" src="${event.target.result}" class="w-full cursor-move"/>
+//             </div>
+//         `);
+
+//         // Load the image to get its height, wight
+//         let img = new Image();
+//         img.onload = function() {
+//             let height = $('#selected_image').height();
+            
+//             // set #img_wrapper height and add absolute class to #selected_image
+//             $('#img_wrapper').addClass(`h-[${height}px]`);
+//             $('#selected_image').addClass(`absolute`);
+//             $('#selected_image').css({'top': 0});
+//         };
+//         img.src = event.target.result; 
+
+
+//         // Add draggable crop area inside image wrapper
+//         $('#img_wrapper').append(`<div id="crop_area" style="width: 100px; height: 100px; border: 2px solid red; position: absolute; top:0; left:0; cursor: move;"></div>`);
+
+//         // Make the crop area draggable inside the image wrapper
+//         let cropArea = $('#crop_area');
+//         cropArea.draggable({
+//             containment: '#img_wrapper'
+//         });
+        
+//         // Add buttons for zoom in, zoom out, and crop
+//         $('#preview_container').append(`
+//             <div class="my-2">
+//                 <button id="zoom_in_button" class="btn btn-primary">Zoom In</button>
+//                 <button id="zoom_out_button" class="btn btn-secondary">Zoom Out</button>
+//                 <button id="crop_button" class="btn btn-success">Crop</button>
+//             </div>
+//         `);
+
+//         // Initialize zoom scale
+//         let zoomScale = 1;
+
+//         // Handle Zoom In button click
+//         $('#zoom_in_button').on('click', function(e) {
+//             e.preventDefault();
+//             zoomScale += 0.5; // Increase zoom scale
+//             $('#selected_image').css('transform', `scale(${zoomScale})`); // Apply scale transformation
+//         });
+
+//         // Handle Zoom Out button click
+//         $('#zoom_out_button').on('click', function(e) {
+//             e.preventDefault();
+//             zoomScale = Math.max(0.5, zoomScale - 0.5); // Decrease zoom scale, but keep it above 0.1
+//             $('#selected_image').css('transform', `scale(${zoomScale})`); // Apply scale transformation
+//         });
+
+        
+//         // Log the selected crop area position on crop button click
+//         $('#crop_button').on('click', function(e) {
+//             e.preventDefault();
+//             let position = cropArea.position();
+//             console.log('Selected area (x, y):', position.left, position.top);
+//         });
+        
+//     };
+//     reader.readAsDataURL(file);
+
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // const $imageInput = $('#id_image');
+    // const $cropImage = $('#cropImage');
+    // const $cropBtn = $('#cropBtn');
+    // const $uploadBtn = $('#submit_btn');
+    // let cropper;
+    // $('.cropper-container.cropper-bg').css({'width': '400px'});
+
+    // $imageInput.on('change', function(e) {
+    //     $uploadBtn.attr('disabled', true);
+    //     $uploadBtn.val('Processing...');
+    //     const file = e.target.files[0];
+    //     if (file) {
+    //         const reader = new FileReader();
+    //         reader.onload = function(event) {
+    //             $cropImage.attr('src', event.target.result).show();
+    //             $cropBtn.show();
+    //             if (cropper) cropper.destroy();
+    //             cropper = new Cropper($cropImage[0], {
+    //                 aspectRatio: 1,
+    //                 viewMode: 1,
+    //                 autoCropArea: 1,
+    //                 scalable: false,
+    //                 zoomable: false,
+    //             });
+                
+    //         $uploadBtn.attr('disabled', false);
+    //         $uploadBtn.val('Upload');
+    //         };
+    //         reader.readAsDataURL(file);
+
+    //     }
+    // });
+
+    // $cropBtn.on('click', function() {
+    //     const canvas = cropper.getCroppedCanvas({
+    //         width: 400,
+    //         height: 400,
+    //     });
+    //     $('#cropped_image').val(canvas.toDataURL('image/png'));
+    //     $cropImage.hide();
+    //     $cropBtn.hide();
+    // });
+// });
+
+</script>
+
+{% endblock %}
